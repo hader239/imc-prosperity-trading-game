@@ -1,0 +1,10 @@
+# Analysis (used in notebooks)
+pandas>=2.2.0
+numpy>=1.26.0
+matplotlib>=3.8.0
+
+# Notebook kernel for Cursor's Jupyter integration
+ipykernel>=6.29.0
+
+# Used by the Trader class for traderData persistence (Phase 5)
+jsonpickle>=3.0.0

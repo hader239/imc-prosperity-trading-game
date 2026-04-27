@@ -6,5 +6,5 @@ matplotlib>=3.8.0
 # Notebook kernel for Cursor's Jupyter integration
 ipykernel>=6.29.0
 
-# Used by the Trader class for traderData persistence (Phase 5)
+# Used by the Trader class for traderData persistence 
 jsonpickle>=3.0.0

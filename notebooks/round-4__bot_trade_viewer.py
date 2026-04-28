@@ -244,6 +244,97 @@ def plot_product_trades(
     return selected.sort_values(["day", "timestamp", "selected_bot", "selected_side"])
 
 
+# %%
+def plot_bot_trade_grid(
+    prices: pd.DataFrame,
+    trades: pd.DataFrame,
+    bot: str,
+    products: Iterable[str],
+    days: Iterable[int],
+    window: Optional[tuple[int, int]] = None,
+    include_background_trades: bool = False,
+    figsize_per_panel: tuple[float, float] = (6.0, 3.6),
+) -> pd.DataFrame:
+    products = list(products)
+    days = list(days)
+    fig, axes = plt.subplots(
+        len(products),
+        len(days),
+        figsize=(figsize_per_panel[0] * len(days), figsize_per_panel[1] * len(products)),
+        squeeze=False,
+    )
+
+    selected_rows = []
+    for row, product in enumerate(products):
+        for col, day in enumerate(days):
+            ax = axes[row, col]
+            px = prices[(prices["product"] == product) & (prices["day"] == day)].copy()
+            tr = trades[(trades["symbol"] == product) & (trades["day"] == day)].copy()
+            if window is not None:
+                start, end = window
+                px = px[(px["timestamp"] >= start) & (px["timestamp"] <= end)]
+                tr = tr[(tr["timestamp"] >= start) & (tr["timestamp"] <= end)]
+
+            buys = tr[tr["buyer"] == bot]
+            sells = tr[tr["seller"] == bot]
+            if not buys.empty:
+                selected_rows.append(buys.assign(selected_bot=bot, selected_side="BUY"))
+            if not sells.empty:
+                selected_rows.append(sells.assign(selected_bot=bot, selected_side="SELL"))
+
+            ax.plot(px["timestamp"], px["mid_price"], lw=0.8, label="mid")
+            if include_background_trades and not tr.empty:
+                ax.scatter(
+                    tr["timestamp"],
+                    tr["price"],
+                    s=tr["quantity"].clip(lower=1) * 4,
+                    color="lightgray",
+                    alpha=0.3,
+                    label="all trades",
+                    zorder=2,
+                )
+            if not buys.empty:
+                ax.scatter(
+                    buys["timestamp"],
+                    buys["price"],
+                    s=buys["quantity"].clip(lower=1) * 16,
+                    marker="^",
+                    color="#1f77b4",
+                    edgecolors="black",
+                    linewidths=0.35,
+                    label=f"{bot} buys",
+                    zorder=3,
+                )
+            if not sells.empty:
+                ax.scatter(
+                    sells["timestamp"],
+                    sells["price"],
+                    s=sells["quantity"].clip(lower=1) * 16,
+                    marker="v",
+                    color="#d62728",
+                    edgecolors="black",
+                    linewidths=0.35,
+                    label=f"{bot} sells",
+                    zorder=3,
+                )
+
+            ax.set_title(f"{product} day {day} ({len(buys)} buys, {len(sells)} sells)")
+            ax.set_xlabel("timestamp")
+            ax.set_ylabel("price")
+            ax.grid(alpha=0.18)
+            ax.legend(loc="best", fontsize=8)
+
+    fig.suptitle(f"{bot} trades", y=1.01)
+    fig.tight_layout()
+    plt.show()
+
+    if not selected_rows:
+        return pd.DataFrame()
+    return pd.concat(selected_rows, ignore_index=True).sort_values(
+        ["day", "symbol", "timestamp", "selected_side"]
+    )
+
+
 # %% [markdown]
 # ## Manual Viewer
 #
@@ -284,6 +375,32 @@ mark67[["day", "timestamp", "selected_bot", "selected_side", "buyer", "seller", 
 
 
 # %% [markdown]
+# ## Mark 14 Focus View
+#
+# Change these values and rerun the cell to inspect Mark 14 directly in the
+# notebook. Start with the liquidity products, then try `VELVETFRUIT_EXTRACT`
+# if you want to compare the less-clean directional-looking flow.
+
+# %%
+MARK14_PRODUCTS = ["HYDROGEL_PACK", "VEV_4000"]
+# MARK14_PRODUCTS = ["VELVETFRUIT_EXTRACT"]
+MARK14_DAYS = [1, 2, 3]
+MARK14_WINDOW = None
+# MARK14_WINDOW = (0, 120_000)
+
+mark14 = plot_bot_trade_grid(
+    prices,
+    trades,
+    bot="Mark 14",
+    products=MARK14_PRODUCTS,
+    days=MARK14_DAYS,
+    window=MARK14_WINDOW,
+    include_background_trades=False,
+)
+mark14[["day", "timestamp", "symbol", "selected_side", "buyer", "seller", "price", "quantity"]].head(50)
+
+
+# %% [markdown]
 # ## Optional Widget Viewer
 #
 # This cell works if `ipywidgets` is installed in your notebook kernel. If not,
@@ -306,7 +423,7 @@ try:
     )
     bot_widget = widgets.SelectMultiple(
         options=available_bots(trades),
-        value=tuple(bot for bot in ("Mark 67",) if bot in available_bots(trades)),
+        value=tuple(bot for bot in ("Mark 14",) if bot in available_bots(trades)),
         description="Bots",
         rows=8,
     )
